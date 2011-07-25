@@ -150,7 +150,7 @@ SC.FlowedLayout = {
   /** @private */
   _scfl_layoutPropertyDidChange: function(){
     this.invokeOnce("_scfl_tile");
-  },
+  }.observes('layoutDirection', 'align', 'flowPadding', 'canWrap', 'defaultFlowSpacing'),
   
   /** @private
     Overriden to only update if it is a view we do not manage, or the width or height has changed
@@ -192,11 +192,15 @@ SC.FlowedLayout = {
   observeChildLayout: function(c) {
     if (c._scfl_isBeingObserved) return;
     c._scfl_isBeingObserved = YES;
+    c.addObserver('flowSpacing', this, '_scfl_layoutPropertyDidChange');
     c.addObserver('isVisible', this, '_scfl_layoutPropertyDidChange');
     c.addObserver('useAbsoluteLayout', this, '_scfl_layoutPropertyDidChange');
     c.addObserver('calculatedWidth', this, '_scfl_layoutPropertyDidChange');
     c.addObserver('calculatedHeight', this, '_scfl_layoutPropertyDidChange');
     c.addObserver('startsNewRow', this, '_scfl_layoutPropertyDidChange');
+    c.addObserver('isSpacer', this, '_scfl_layoutPropertyDidChange');
+    c.addObserver('fillWidth', this, '_scfl_layoutPropertyDidChange');
+    c.addObserver('fillHeight', this, '_scfl_layoutPropertyDidChange');
   },
   
   /** @private
@@ -204,11 +208,15 @@ SC.FlowedLayout = {
   */
   unobserveChildLayout: function(c) {
     c._scfl_isBeingObserved = NO;
+    c.removeObserver('flowSpacing', this, '_scfl_layoutPropertyDidChange');
     c.removeObserver('isVisible', this, '_scfl_layoutPropertyDidChange');
     c.removeObserver('useAbsoluteLayout', this, '_scfl_layoutPropertyDidChange');
     c.removeObserver('calculatedWidth', this, '_scfl_layoutPropertyDidChange');
     c.removeObserver('calculatedHeight', this, '_scfl_layoutPropertyDidChange');
     c.removeObserver('startsNewRow', this, '_scfl_layoutPropertyDidChange');
+    c.removeObserver('isSpacer', this, '_scfl_layoutPropertyDidChange');
+    c.removeObserver('fillWidth', this, '_scfl_layoutPropertyDidChange');
+    c.removeObserver('fillHeight', this, '_scfl_layoutPropertyDidChange');
   },
   
   /**
@@ -233,6 +241,7 @@ SC.FlowedLayout = {
   flowSpacingForChild: function(idx, view) {
     var spacing = view.get("flowSpacing");
     if (SC.none(spacing)) spacing = this.get("defaultFlowSpacing");
+    if (SC.none(spacing)) spacing = 0;
     
     if (SC.typeOf(spacing) === SC.T_NUMBER) {
       spacing = { left: spacing, right: spacing, bottom: spacing, top: spacing };
@@ -259,7 +268,7 @@ SC.FlowedLayout = {
   flowSizeForChild: function(idx, view) {
     var cw = view.get('calculatedWidth'), ch = view.get('calculatedHeight');
     
-    var calc = {}, f = view.get('frame');
+    var calc = {}, f = view.get('frame'), l = view.get('layout');
     view._scfl_lastFrame = f;
     
     // if there is a calculated width, use that. NOTE: if calculatedWidth === 0,
@@ -280,19 +289,31 @@ SC.FlowedLayout = {
     // if it is a spacer, we must set the dimension that it
     // expands in to 0.
     if (view.get('isSpacer')) {
-      if (this.get('layoutDirection') === SC.LAYOUT_HORIZONTAL) calc.width = 0;
-      else calc.height = 0;
+      if (this.get('layoutDirection') === SC.LAYOUT_HORIZONTAL) {
+        calc.width = l.minWidth || 0;
+      } else {
+        calc.height = l.minHeight || 0;
+      }
     }
     
     // if it has a fillWidth/Height, clear it for later
     if (
       this.get('layoutDirection') === SC.LAYOUT_HORIZONTAL && view.get('fillHeight')
     ) {
-      calc.height = 0;
+      calc.height = l.minHeight || 0;
     } else if (
       this.get('layoutDirection') === SC.LAYOUT_VERTICAL && view.get('fillWidth')
     ) {
-      calc.width = 0;
+      calc.width = l.minWidth || 0;
+    }
+
+    // finally, RECREATE the view's layout if it is invalid (lacks a width or a height)
+    if (l.width == undefined) {
+      view.adjust('width', f.width);
+    }
+
+    if (l.height == undefined) {
+      view.adjust('height', f.height);
     }
     
     // return
@@ -305,12 +326,34 @@ SC.FlowedLayout = {
   }.property('calculatedWidth', 'calculatedHeight'),
   
   /** @private */
+
+  // the maximum row length when all flexible items are collapsed.
+  _scfl_maxCollapsedRowLength: 0,
+
+  // the total row size when all flexible rows are collapsed.
+  _scfl_totalCollapsedRowSize: 0,
+
+
   _scfl_calculatedSizeDidChange: function() {
     if(this.get('autoResize')) {
-      if(this.get('shouldResizeWidth')) this.adjust('minWidth', this.get('calculatedWidth'));
-      if(this.get('shouldResizeHeight')) this.adjust('minHeight', this.get('calculatedHeight'));
+      if (this.get('layoutDirection') == SC.LAYOUT_VERTICAL) {
+        if (this.get('shouldResizeHeight')) {
+          this.adjust('minHeight', this.get('_scfl_maximumCollapsedRowLength'));
+        }
+
+        if (this.get('shouldResizeWidth')) {
+          this.adjust('minWidth', this.get('_scfl_totalCollapsedRowSize'));
+        }
+      } else {
+        if (this.get('shouldResizeWidth')) {
+          this.adjust('minWidth', this.get('_scfl_maximumCollapsedRowLength'));
+        }
+        if (this.get('shouldResizeHeight')) {
+          this.adjust('minHeight', this.get('_scfl_totalCollapsedRowSize'));
+        }
+      }
     }
-  }.observes('autoResize', 'shouldResizeWidth', 'calculatedWidth', 'shouldResizeHeight', 'calculatedHeight'),
+  }.observes('autoResize', 'shouldResizeWidth', '_scfl_maximumCollapsedRowLength', '_scfl_totalCollapsedRowSize', 'shouldResizeHeight'),
   
   /**
     @private
@@ -344,6 +387,14 @@ SC.FlowedLayout = {
       // The rows array starts empty. It will get filled out by the method
       // _scfl_distributeChildrenIntoRows.
       rows: undefined,
+
+
+      // the maximum row length where all collapsible items are collapsed.
+      maximumCollapsedRowLength: 0,
+
+      // the total sizes of all rows when collapsed (With flex-height rows
+      // at minimum size)
+      totalCollapsedRowSize: 0,
       
       // These properties are calculated once here, but later used by
       // the various methods.
@@ -429,7 +480,8 @@ SC.FlowedLayout = {
         items = [], itemOffset = 0, isVertical = plan.isVertical, itemSize, itemLength,
         canWrap = this.get('canWrap'),
         newRowPending = NO;
-    
+
+    var maxItemLength = 0;
     var max = row.plan.maximumRowLength;
     
     for (idx = startingAt; idx < len; idx++) {
@@ -438,12 +490,13 @@ SC.FlowedLayout = {
       // this must be set before we check if the child is included because even
       // if it isn't included, we need to remember that there is a line break
       // for later
-      newRowPending = newRowPending || (idx !== startingAt && child.get('startsNewRow'));
+      newRowPending = newRowPending || (items.length > 0 && child.get('startsNewRow'));
 
       if (!this.shouldIncludeChildInFlow(idx, child)) continue;
       
       childSize = this.flowSizeForChild(idx, child);
       spacing = this.flowSpacingForChild(idx, child);
+
       childSpacedSize = {
         width: childSize.width + spacing.left + spacing.right,
         height: childSize.height + spacing.top + spacing.bottom
@@ -487,9 +540,18 @@ SC.FlowedLayout = {
       
       items.push(item);
       itemOffset += itemLength;
+      maxItemLength = Math.max(itemLength, maxItemLength);
     }
     
     row.rowLength = itemOffset;
+
+    // if the row cannot wrap, then the minimum size for the row (and therefore collapsed size)
+    // is the same as the current row length: it consists of the minimum size of all items.
+    //
+    // If the row can wrap, then the longest item will determine the size of a fully 
+    // collapsed (one item per row) layout.
+    var minRowLength = canWrap ? maxItemLength : row.rowLength;
+    row.plan.maximumCollapsedRowLength = Math.max(minRowLength, row.plan.maximumCollapsedRowLength);
     row.items = items;
     return idx;
   },
@@ -569,6 +631,8 @@ SC.FlowedLayout = {
     row.shouldExpand = shouldExpand;
     row.rowLength = position - row.plan.rowStartPadding; // row length does not include padding
     row.rowSize = rowSize;
+
+    row.plan.totalCollapsedRowSize += row.rowSize;
     
   },
 
@@ -658,8 +722,9 @@ SC.FlowedLayout = {
     this.beginPropertyChanges();
 
     this.set('calculatedHeight', isVertical ? longestRow : totalSize);
-
     this.set('calculatedWidth', isVertical ? totalSize : longestRow);
+    this.set('_scfl_maximumCollapsedRowLength', plan.maximumCollapsedRowLength);
+    this.set('_scfl_totalCollapsedRowSize', plan.totalCollapsedRowSize);
 
     this.endPropertyChanges();
   },
@@ -699,11 +764,15 @@ SC.FlowedLayout = {
   
   /** @private */
   _scfl_frameDidChange: function() {
-    var frame = this.get("frame"), lf = this._scfl_lastFrameSize;
-    this._scfl_lastFrameSize = frame;
+    if (this._scfl_isChangingSize) return;
 
-    if (lf && lf.width == frame.width && lf.height == frame.height) return;
-    
+    var frame = this.get("frame"), lf = this._scfl_lastFrameSize || {};
+    this._scfl_lastFrameSize = SC.clone(frame);
+
+    if (lf.width == frame.width && lf.height == frame.height) {
+      return;
+    }
+
     this.invokeOnce("_scfl_tile");
   }.observes("frame"),
   

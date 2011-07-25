@@ -32,6 +32,9 @@ sc_require('ext/function');
   set isError to YES, then calling SC.ok(obj) on your object will return NO.
   If isError is YES, then SC.val(obj) will return your errorValue property
   instead of the receiver.
+  
+  When using SC.typeOf(obj), SC.T_ERROR will only be returned if the obj
+  is an instance of SC.Error
 
   @extends SC.Object
   @since SproutCore 1.0
@@ -124,7 +127,7 @@ SC.$error = function(description, label, value, c) {
 } ;
 
 /**
-  Returns YES if the passed value is an error object or false.
+  Returns NO if the passed value is an error object or false.
 
   @param {Object} ret object value
   @returns {Boolean}

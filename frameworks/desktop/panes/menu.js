@@ -39,7 +39,7 @@ sc_require('views/menu_item');
 
       var menuItems = [
         { title: 'Menu Item', keyEquivalent: 'ctrl_shift_n' },
-        { title: 'Checked Menu Item', isChecked: YES, keyEquivalent: 'ctrl_a' },
+        { title: 'Checked Menu Item', checkbox: YES, keyEquivalent: 'ctrl_a' },
         { title: 'Selected Menu Item', keyEquivalent: ['backspace', 'delete'] },
         { isSeparator: YES },
         { title: 'Menu Item with Icon', icon: 'inbox', keyEquivalent: 'ctrl_m' },
@@ -235,7 +235,7 @@ SC.MenuPane = SC.PickerPane.extend(
     @default YES
   */
   localize: YES,
-  
+
   /**
     Whether or not this menu pane should accept the “current menu pane”
     designation when visible, which is the highest-priority pane when routing
@@ -246,10 +246,10 @@ SC.MenuPane = SC.PickerPane.extend(
     @default YES
   */
   acceptsMenuPane: YES,
-  
+
   /**
     Disable context menu.
-    
+
     @property {Boolean}
     @default NO
   */
@@ -383,7 +383,7 @@ SC.MenuPane = SC.PickerPane.extend(
   itemSeparatorKey: 'separator',
 
   /**
-    The name of the property that contains the target for the action that is 
+    The name of the property that contains the target for the action that is
     triggered when the user clicks the menu item.
 
     Note that this property is ignored if the menu item has a submenu.
@@ -457,14 +457,32 @@ SC.MenuPane = SC.PickerPane.extend(
   itemDisableMenuFlashKey: 'disableMenuFlash',
 
   /**
-    The array of keys used by `SC.MenuItemView` when inspecting your menu items
+    The name of the property that determines whether layerID should be applied to the item .
+
+    @type String
+    @default "layerId"
+    @commonTask Menu Item Properties
+  */
+  itemLayerIdKey: 'layerId',
+
+  /**
+    The name of the property that determines whether a unique exampleView should be created for the item .
+
+    @type String
+    @default "exampleView"
+    @commonTask Menu Item Properties
+  */
+  itemExampleViewKey: 'exampleView',
+
+  /**
+    The array of keys used by SC.MenuItemView when inspecting your menu items
     for display properties.
 
     @private
     @isReadOnly
     @property Array
   */
-  menuItemKeys: ['itemTitleKey', 'itemValueKey', 'itemIsEnabledKey', 'itemIconKey', 'itemSeparatorKey', 'itemActionKey', 'itemCheckboxKey', 'itemShortCutKey', 'itemHeightKey', 'itemSubMenuKey', 'itemKeyEquivalentKey', 'itemTargetKey'],
+  menuItemKeys: ['itemTitleKey', 'itemValueKey', 'itemIsEnabledKey', 'itemIconKey', 'itemSeparatorKey', 'itemActionKey', 'itemCheckboxKey', 'itemShortCutKey', 'itemHeightKey', 'itemSubMenuKey', 'itemKeyEquivalentKey', 'itemTargetKey', 'itemLayerIdKey'],
 
   // ..........................................................
   // INTERNAL PROPERTIES
@@ -579,7 +597,7 @@ SC.MenuPane = SC.PickerPane.extend(
   },
 
   /**
-    Remove the menu pane status from the pane.  This will simply set the 
+    Remove the menu pane status from the pane.  This will simply set the
     `menuPane` on the `rootResponder` to `null.
 
     @returns {SC.Pane} receiver
@@ -595,25 +613,43 @@ SC.MenuPane = SC.PickerPane.extend(
     This computed property parses `displayItems` and constructs an
     `SC.MenuItemView` (or whatever class you have set as the `exampleView`) for every item.
 
+    This calls createMenuItemViews. If you want to override this property, override
+    that method.
+
+    This calls createMenuItemViews. If you want to override this property, override
+    that method.
+
     @property
     @type Array
     @readOnly
   */
   menuItemViews: function() {
+    return this.createMenuItemViews();
+  }.property('displayItems').cacheable(),
+
+  /**
+    Processes the displayItems and creates menu item views for each item.
+
+    Override this method to change how menuItemViews is calculated.
+
+    @return Array
+  */
+  createMenuItemViews: function() {
     var views = [], items = this.get('displayItems'),
-        exampleView = this.get('exampleView'), item, view,
+        exampleView = this.get('exampleView'), item, itemView, view,
         height, heightKey, separatorKey, defaultHeight, separatorHeight,
         menuHeight, menuHeightPadding, keyEquivalentKey, keyEquivalent,
-        keyArray, idx,
+        keyArray, idx, layerIdKey, propertiesHash,
         len;
 
     if (!items) return views; // return an empty array
     heightKey = this.get('itemHeightKey');
     separatorKey = this.get('itemSeparatorKey');
+    exampleViewKey = this.get('itemExampleViewKey');
     defaultHeight = this.get('itemHeight');
     keyEquivalentKey = this.get('itemKeyEquivalentKey');
     separatorHeight = this.get('itemSeparatorHeight');
-
+    layerIdKey = this.get('itemLayerIdKey');
     menuHeightPadding = Math.floor(this.get('menuHeightPadding')/2);
     menuHeight = menuHeightPadding;
 
@@ -626,15 +662,29 @@ SC.MenuPane = SC.PickerPane.extend(
       if (!height) {
         height = item.get(separatorKey) ? separatorHeight : defaultHeight;
       }
-      view = this._menuView.createChildView(exampleView, {
+
+      propertiesHash = {
         layout: { height: height, top: menuHeight },
         contentDisplayProperties: keyArray,
         content: item,
         parentMenu: this
-      });
+      };
+
+      if(item.get(layerIdKey)) {
+        propertiesHash.layerId = item.get(layerIdKey);
+      }
+
+      // Item has its own exampleView so use it
+      itemExampleView = item.get(exampleViewKey);
+      if (itemExampleView) {
+        itemView = itemExampleView;
+      } else {
+        itemView = exampleView;
+      }
+
+      view = this._menuView.createChildView(itemView, propertiesHash);
       views[idx] = view;
       menuHeight += height;
-
       keyEquivalent = item.get(keyEquivalentKey);
       if (keyEquivalent) {
         // if array, apply each one for this view
@@ -651,7 +701,7 @@ SC.MenuPane = SC.PickerPane.extend(
 
     this.set('menuHeight', menuHeight+menuHeightPadding);
     return views;
-  }.property('displayItems').cacheable(),
+  },
 
   /**
     Returns the menu item view for the content object at the specified index.
@@ -997,7 +1047,7 @@ SC.MenuPane = SC.PickerPane.extend(
   performKeyEquivalent: function(keyEquivalent, evt, fromVisibleControl) {
     //If menu is not visible
     if (!fromVisibleControl && !this.get('isVisibleInWindow')) return NO;
-    
+
     // Look for menu item that has this key equivalent
     var menuItem = this._keyEquivalents[keyEquivalent];
 

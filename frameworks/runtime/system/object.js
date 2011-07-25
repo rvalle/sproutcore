@@ -456,9 +456,9 @@ SC.mixin(SC.Object, /** @scope SC.Object */ {
   */
   design: function() {
     if (this.isDesign) {
-      //@ if (debug)
+      // @if (debug)
       SC.Logger.warn("SC.Object#design called twice for %@.".fmt(this));
-      //@ endif
+      // @endif
       return this;
     }
 
@@ -555,7 +555,7 @@ SC.Object.prototype = {
     Although the default init() method returns the receiver, the return
     value is ignored.
 
-    
+
   */
   init: function() {
     this.initObservable();
@@ -563,7 +563,7 @@ SC.Object.prototype = {
   },
 
   /**
-    Set to NO once this object has been destroyed.
+    Set to YES once this object has been destroyed.
 
     @type Boolean
   */
@@ -729,7 +729,7 @@ SC.Object.prototype = {
     method is called automatically for view classes but may be used for any
     object.
 
-    
+
   */
   awake: function() {
     var outlets = this.outlets,

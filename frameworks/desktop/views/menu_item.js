@@ -28,10 +28,10 @@ SC.MenuItemView = SC.View.extend(SC.ContentDisplay,
 
   /**
     @type Array
-    @default ['title', 'isEnabled', 'isSeparator']
+    @default ['title', 'isEnabled', 'isSeparator', 'isChecked']
     @see SC.View#displayProperties
   */
-  displayProperties: ['title', 'isEnabled', 'isSeparator'],
+  displayProperties: ['title', 'isEnabled', 'isSeparator', 'isChecked'],
 
 
   /**
@@ -54,7 +54,7 @@ SC.MenuItemView = SC.View.extend(SC.ContentDisplay,
     @default YES
   */
   acceptsFirstResponder: YES,
-  
+
   /**
     IE only attribute to block bluring of other controls
 
@@ -104,6 +104,16 @@ SC.MenuItemView = SC.View.extend(SC.ContentDisplay,
   }.property('content.isEnabled').cacheable(),
 
   /**
+    YES if the menu item should include a check next to it.
+
+    @type Boolean
+    @property
+  */
+  isChecked: function() {
+    return this.getContentProperty('itemCheckboxKey');
+  }.property(),
+
+  /**
     This menu item's submenu, if it exists.
 
     @field
@@ -130,7 +140,8 @@ SC.MenuItemView = SC.View.extend(SC.ContentDisplay,
           isModal: NO,
           isSubMenu: YES,
           parentMenu: parentMenu,
-          controlSize: parentMenu.get('controlSize')
+          controlSize: parentMenu.get('controlSize'),
+          exampleView: parentMenu.get('exampleView')
         });
       }
     }
@@ -172,10 +183,10 @@ SC.MenuItemView = SC.View.extend(SC.ContentDisplay,
     this.set('itemHeight',itemHeight);
 
     //addressing accessibility
-    if(content.get(menu.itemSeparatorKey)){
+    if (this.get('isSeparator')) {
       //assign the role of separator
       context.attr('role', 'separator');
-    } else if (this.getContentProperty('itemCheckboxKey')) {
+    } else if (this.get('isChecked')) {
       //assign the role of menuitemcheckbox
       context.attr('role', 'menuitemcheckbox');
       context.attr('aria-checked', true);
@@ -183,7 +194,7 @@ SC.MenuItemView = SC.View.extend(SC.ContentDisplay,
 
     context = context.begin('a').addClass('menu-item');
 
-    if (content.get(menu.itemSeparatorKey)) {
+    if (this.get('isSeparator')) {
       context.push('<span class="separator"></span>');
       context.addClass('disabled');
     } else {
@@ -197,7 +208,7 @@ SC.MenuItemView = SC.View.extend(SC.ContentDisplay,
       if (SC.typeOf(val) !== SC.T_STRING) val = val.toString();
       this.renderLabel(context, val);
 
-      if (this.getContentProperty('itemCheckboxKey')) {
+      if (this.get('isChecked')) {
         context.push('<div class="checkbox"></div>');
       }
 
@@ -292,7 +303,7 @@ SC.MenuItemView = SC.View.extend(SC.ContentDisplay,
 
   /**
     The title from the content property.
-    
+
     @field
     @type String
     @observes content.title
@@ -460,9 +471,10 @@ SC.MenuItemView = SC.View.extend(SC.ContentDisplay,
     }
 
     if(this.get('hasSubMenu')) {
-      this._subMenuTimer = this.invokeLater(this.showSubMenu,100) ;
+      this._subMenuTimer = this.invokeLater(this.showSubMenu, 100) ;
     }
-	  return YES ;
+
+	  return YES;
   },
 
   /** @private

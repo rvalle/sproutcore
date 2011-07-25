@@ -8,7 +8,7 @@
 sc_require("system/utils/string_measurement");
 
 /**
-  @mixin
+  @class
   Use this mixin to make your view automatically resize based upon its value,
   title, or other string property. Only works for views that support automatic
   resizing.
@@ -134,6 +134,9 @@ SC.AutoResize = {
       // if so, cancel the old request and make a new one
       SC.AutoResizeManager.cancelMeasurementForView(this, requestedBatchResizeId);
       SC.AutoResizeManager.scheduleMeasurementForView(this, batchResizeId);
+
+      // update the requested batchResizeId to the new id
+      this._scar_requestedBatchResizeId = batchResizeId;
     }
   }.observes('batchResizeId'),
 
@@ -151,7 +154,7 @@ SC.AutoResize = {
 
     this._scar_measurementPending = YES;
     this._scar_requestedBatchResizeId = batchResizeId;
-  },
+  }.observes('isVisible'),
 
   /**
     Measures the size of the view.
@@ -160,7 +163,8 @@ SC.AutoResize = {
   */
   measureSize: function(batch) {
     var metrics, layer, value = this.get('autoResizeText'),
-        autoSizePadding, paddingHeight, paddingWidth;
+        autoSizePadding, paddingHeight, paddingWidth,
+        ignoreEscape = !this.get('escapeHTML');
 
     // There are two special cases.
     //   - empty: we should do nothing. The metrics are 0.
@@ -172,7 +176,7 @@ SC.AutoResize = {
     if (SC.none(value) || value === "") {
       metrics = { width: 0, height: 0 };
     } else if (batch) {
-      metrics = SC.measureString(value);
+      metrics = SC.measureString(value, ignoreEscape);
     } else {
       // Normal resize pattern: get our own layer, pass it as a template to SC.metricsForString.
       layer = this.get('autoResizeLayer');
@@ -181,7 +185,7 @@ SC.AutoResize = {
         return;
       }
 
-      metrics = SC.metricsForString(value, layer);
+      metrics = SC.metricsForString(value, layer, this.get('classNames'), ignoreEscape);
     }
 
     // metrics should include padding
@@ -310,7 +314,7 @@ SC.AutoResizeManager = {
       return SC.AutoResizeManager.doBatchResize();
     }
 
-    var tag, views, view, layer, batches;
+    var tag, views, view, layer, batches, prepared;
 
     // first measure all the batched views
     batches = this.viewsNeedingResize;
@@ -318,25 +322,18 @@ SC.AutoResizeManager = {
       if (batches.hasOwnProperty(tag)) {
         views = batches[tag];
 
-        // step through until you find one with a layer
+        // now measure the rest using the same settings
         while ((view = views.pop())) {
-          layer = view.get('autoResizeLayer');
+          if(view.get('isVisible') && (layer = view.get('autoResizeLayer'))) {
+            if(!prepared) SC.prepareStringMeasurement(layer);
 
-          // use the layer to prepare the measurement
-          if(layer) {
-            SC.prepareStringMeasurement(layer);
             view.measureSize(YES);
-            break;
           }
         }
 
-        // now measure the rest using the same settings
-        while ((view = views.pop())) {
-          view.measureSize(YES);
-        }
-
-        SC.teardownStringMeasurement();
-
+        // if they were all isVisible:NO, then prepare was never called
+        // so dont call teardown
+        if(prepared) SC.teardownStringMeasurement();
       }
     }
 

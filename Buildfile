@@ -28,13 +28,15 @@ end
 config :bootstrap,  :required => [], :use_modules => false
 
 config :jquery,          :required => [], :test_required => [], :debug_required => []
+config :yuireset,        :required => [], :test_required => [], :debug_required => []
 config :handlebars,      :required => []
 config :runtime,         :required => [:jquery]
 config :'datetime/core', :required => [:runtime]
 config :datetime,        :required => [:'datetime/core']
-config :core_foundation, :required => [:runtime, :handlebars]
+config :core_foundation, :required => [:runtime, :handlebars, :yuireset]
 config :'datetime/localized', :required => [:core_foundation]
-config :foundation,      :required => [:core_foundation, :datetime, :'datetime/localized', :ajax]
+config :routing,         :required => [:core_foundation]
+config :foundation,      :required => [:routing, :core_foundation, :datetime, :'datetime/localized', :ajax]
 config :datastore,       :required => [:runtime, :datetime]
 config :desktop,         :required => [:foundation]
 config :media,           :required => [:desktop]
@@ -42,10 +44,9 @@ config :statechart,      :required => [:core_foundation], :test_required => [:co
 config :ajax,            :required => [:runtime, :core_foundation]
 
 # WRAPPER FRAMEWORKS
-config :sproutcore, :required => [:desktop, :datastore]
+config :sproutcore, :required => [:desktop, :datastore, :statechart]
 config :mini, :required => [:runtime, :datastore]
 config :animation, :required => :foundation
-config :forms, :required => :desktop
 
 config :qunit, :required => []
 config :testing, :required => [:jquery], :test_required => [], :debug_required => []
@@ -84,8 +85,12 @@ config :ace,
 
 # CONFIGURE APPS
 config :core_tools, :required => [
-  :desktop, :datastore, :animation, :forms,
-  "sproutcore/ace", "sproutcore/experimental/split_view"
+  :desktop, :datastore, :animation, "sproutcore/experimental/forms",
+  "sproutcore/ace",
+
+  # The SC apps will use the experimental version of these controls:
+  "sproutcore/experimental/select_view",
+  "sproutcore/experimental/split_view"
 ]
 
 # mode :debug do

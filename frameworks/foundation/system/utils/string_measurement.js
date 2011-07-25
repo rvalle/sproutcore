@@ -10,7 +10,7 @@ SC.mixin( /** @scope SC */ {
   _copy_computed_props: [
     "maxWidth", "maxHeight", "paddingLeft", "paddingRight", "paddingTop", "paddingBottom",
     "fontFamily", "fontSize", "fontStyle", "fontWeight", "fontVariant", "lineHeight",
-    "whiteSpace"
+    "whiteSpace", "letterSpacing"
   ],
 
   /**
@@ -118,15 +118,12 @@ SC.mixin( /** @scope SC */ {
     if (!element) {
       var parentElement = document.createElement("div");
 
-      // to make sure the measurement element is never visible, put it inside a 0x0 element with overflow: hidden
-      SC.mixin(parentElement.style, {
-        position: 'absolute',
-        left: '0px',
-        top: '0px',
-        height: '0px',
-        right: '0px',
-        overflow: 'hidden'
-      });
+      // To have effectively unbounded widths when no max-width is set,
+      // give the metricsCalculationElement a very wide sandbox.
+      // To make sure it's never visible, position it way, way offscreen.
+      parentElement.style.cssText = "position:absolute; left:-10010px; top:-10px;"+
+                                    "width:10000px; height:0px; overflow:hidden;"+
+                                    "visibility:hidden;";
 
       element = this._metricsCalculationElement = document.createElement("div");
 
@@ -219,8 +216,11 @@ SC.mixin( /** @scope SC */ {
       throw "measureString requires a string measurement environment to be set up. Did you mean metricsForString?";
     }
 
+    // since the string has already been escaped (if the user wants it to be),
+    // we should set the innerHTML instead of innertext
+    if(ignoreEscape) element.innerHTML = string;
     // the conclusion of which to use (innerText or textContent) should be cached
-    if (typeof element.innerText != "undefined") element.innerText = string;
+    else if (typeof element.innerText != "undefined") element.innerText = string;
     else element.textContent = string;
 
     // generate result

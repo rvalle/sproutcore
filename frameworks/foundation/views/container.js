@@ -63,7 +63,8 @@ SC.ContainerView = SC.View.extend(
     @param {SC.View} newContent the new content view or null.
   */
   replaceContent: function(newContent) {
-    this.replaceAllChildren(newContent ? [newContent] : []);
+    this.removeAllChildren() ;
+    if (newContent) this.appendChild(newContent) ;
   },
 
   /** @private */
@@ -83,9 +84,7 @@ SC.ContainerView = SC.View.extend(
   awake: function() {
     sc_super();
     var nowShowing = this.get('nowShowing') ;
-    if (nowShowing && nowShowing.length>0) {
-      this.nowShowingDidChange();
-    }
+    if (nowShowing && nowShowing.length>0) this.nowShowingDidChange();
   },
   
   /**
@@ -103,7 +102,13 @@ SC.ContainerView = SC.View.extend(
     
     // If nowShowing was changed because the content was set directly, then do nothing.
     if (content === SC.CONTENT_SET_DIRECTLY) return ;
-    
+
+    // Take note now if we need to destroy the current contentView
+    var viewToDestroy = (this._instantiatedLastView === YES) ? this.get('contentView') : null;
+
+    // Reset for next time
+    this._instantiatedLastView = NO;
+
     // If it's a string, try to turn it into the object it references...
     if (SC.typeOf(content) === SC.T_STRING && content.length > 0) {
       if (content.indexOf('.') > 0) {
@@ -117,7 +122,10 @@ SC.ContainerView = SC.View.extend(
     // If it's an uninstantiated view, then attempt to instantiate it.
     // (Uninstantiated views have a create() method; instantiated ones do not.)
     if (SC.typeOf(content) === SC.T_CLASS) {
-      if (content.kindOf(SC.CoreView)) content = content.create();
+      if (content.kindOf(SC.CoreView)) {
+        content = this.createChildView(content);
+        this._instantiatedLastView = YES;
+      } 
       else content = null;
     } 
     
@@ -126,6 +134,9 @@ SC.ContainerView = SC.View.extend(
     
     // Sets the content.
     this.set('contentView', content) ;
+
+    // If we need to cleanup the previous view, do so
+    if(viewToDestroy) viewToDestroy.destroy();
     
   }.observes('nowShowing'),
   

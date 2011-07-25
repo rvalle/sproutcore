@@ -18,7 +18,8 @@ SC.CAPTURE_BACKSPACE_KEY = NO ;
   RootResponder directly.  Instead you will work with Pane objects, which
   register themselves with the RootResponder as needed to receive events.
 
-  ## RootResponder and Platforms
+  RootResponder and Platforms
+  ---
 
   RootResponder contains core functionality common among the different web
   platforms. You will likely be working with a subclass of RootResponder that
@@ -27,7 +28,8 @@ SC.CAPTURE_BACKSPACE_KEY = NO ;
   The correct instance of RootResponder is detected at runtime and loaded
   transparently.
 
-  ## Event Types
+  Event Types
+  ---
 
   RootResponders can route four types of events:
 
@@ -46,7 +48,8 @@ SC.CAPTURE_BACKSPACE_KEY = NO ;
      explicit target, or allow the action to traverse the hierarchy until a
      view is found that handles it.
 */
-SC.RootResponder = SC.Object.extend({
+SC.RootResponder = SC.Object.extend(
+  /** @scope SC.RootResponder.prototype */{
 
   /**
     Contains a list of all panes currently visible on screen.  Everytime a
@@ -68,7 +71,7 @@ SC.RootResponder = SC.Object.extend({
   // MAIN PANE
   //
 
-  /** @property
+  /**
     The main pane.  This pane receives shortcuts and actions if the
     focusedPane does not respond to them.  There can be only one main pane.
     You can swap main panes by calling makeMainPane() here.
@@ -76,6 +79,8 @@ SC.RootResponder = SC.Object.extend({
     Usually you will not need to edit the main pane directly.  Instead, you
     should use a MainPane subclass, which will automatically make itself main
     when you append it to the document.
+
+    @type SC.MainPane
   */
   mainPane: null,
 
@@ -89,7 +94,7 @@ SC.RootResponder = SC.Object.extend({
     document body.  That will be handled by the Pane itself.
 
     @param {SC.Pane} pane
-    @returns {SC.RootResponder} receiver
+    @returns {SC.RootResponder}
   */
   makeMainPane: function(pane) {
     var currentMain = this.get('mainPane') ;
@@ -339,8 +344,17 @@ SC.RootResponder = SC.Object.extend({
     (removing sc-blur).  Also notify panes.
   */
   focus: function() {
+
     if (!this.get('hasFocus')) {
       SC.$('body').addClass('sc-focus').removeClass('sc-blur');
+
+      // If the app is getting focus again set the first responder to the first
+      // valid firstResponder view in the view's tree
+      if(!SC.TABBING_ONLY_INSIDE_DOCUMENT){
+        var mainPane = this.get('mainPane'),
+            nextValidKeyView = mainPane ? mainPane.get('nextValidKeyView') : null;
+        if (nextValidKeyView) mainPane.makeFirstResponder(nextValidKeyView);
+      }
 
       SC.run(function() {
         this.set('hasFocus', YES);
@@ -682,18 +696,18 @@ SC.RootResponder = SC.Object.extend({
     }
     SC.Event.add(document, mousewheel, this, this.mousewheel);
 
-    // If the browser is identifying itself as a touch-enabled browser, but
-    // touch events are not present, assume this is a desktop browser doing
-    // user agent spoofing and simulate touch events automatically.
-    if (SC.browser && SC.platform && SC.browser.mobileSafari && !SC.platform.touch) {
-      SC.platform.simulateTouchEvents();
-    }
-
     // do some initial set
     this.set('currentWindowSize', this.computeWindowSize()) ;
-    this.focus(); // assume the window is focused when you load.
 
     if (SC.browser.mobileSafari) {
+
+      // If the browser is identifying itself as a touch-enabled browser, but
+      // touch events are not present, assume this is a desktop browser doing
+      // user agent spoofing and simulate touch events automatically.
+      if (SC.platform && !SC.platform.touch) {
+        SC.platform.simulateTouchEvents();
+      }
+
       // Monkey patch RunLoop if we're in MobileSafari
       var f = SC.RunLoop.prototype.endRunLoop, patch;
 
@@ -1683,9 +1697,9 @@ SC.RootResponder = SC.Object.extend({
   /**
     IE's default behavior to blur textfields and other controls can only be
     blocked by returning NO to this event. However we don't want to block
-    its default behavior otherwise textfields won't loose focus by clicking on
+    its default behavior otherwise textfields won't lose focus by clicking on
     an empty area as it's expected. If you want to block IE from bluring another
-    control set blockIEDeactivate to true on the especific view in which you
+    control set blockIEDeactivate to true on the specific view in which you
     want to avoid this. Think of an autocomplete menu, you want to click on
     the menu but don't loose focus.
   */
@@ -1707,10 +1721,9 @@ SC.RootResponder = SC.Object.extend({
   mousedown: function(evt) {
     if (SC.platform.touch) {
       evt.allowDefault();
+      this._lastMouseDownCustomHandling = YES;
       return YES;
     }
-
-    if(!SC.browser.msie) window.focus();
 
     // First, save the click count. The click count resets if the mouse down
     // event occurs more than 250 ms later than the mouse up event or more
@@ -1764,6 +1777,7 @@ SC.RootResponder = SC.Object.extend({
   mouseup: function(evt) {
     if (SC.platform.touch) {
       evt.allowDefault();
+      this._lastMouseUpCustomHandling = YES;
       return YES;
     }
 

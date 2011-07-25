@@ -51,23 +51,32 @@ sc_require('ext/handlebars');
         displayTemplate: fn,
         inverseTemplate: inverse,
         property: property,
-        previousContext: this
+        previousContext: this,
+        tagName: (options.hash.tagName || "span")
       });
+
+      var observer, invoker;
 
       view.get('childViews').push(bindView);
 
-      // Observe the given property on the context and
-      // tells the SC._BindableSpan to re-render.
-      this.addObserver(property, this, function observer() {
+      observer = function() {
         if (bindView.get('layer')) {
           bindView.rerender();
         } else {
           // If no layer can be found, we can assume somewhere
           // above it has been re-rendered, so remove the
           // observer.
-          this.removeObserver(property, this, observer);
+          this.removeObserver(property, invoker);
         }
-      });
+      };
+
+      invoker = function() {
+        this.invokeOnce(observer);
+      };
+
+      // Observe the given property on the context and
+      // tells the SC._BindableSpan to re-render.
+      this.addObserver(property, invoker);
 
       var context = bindView.renderContext(bindView.get('tagName'));
       bindView.renderToContext(context);
@@ -142,10 +151,9 @@ Handlebars.registerHelper('bindAttr', function(options) {
     var property = attrs[attr];
     var value = this.getPath(property);
 
-    // Add an observer to the view for when the property changes.
-    // When the observer fires, find the element using the
-    // unique data id and update the attribute to the new value.
-    this.addObserver(property, function observer() {
+    var observer, invoker;
+
+    observer = function observer() {
       var result = this.getPath(property);
       var elem = view.$("[data-handlebars-id='" + dataId + "']");
 
@@ -154,23 +162,34 @@ Handlebars.registerHelper('bindAttr', function(options) {
       // In that case, we can assume the template has been re-rendered
       // and we need to clean up the observer.
       if (elem.length === 0) {
-        this.removeObserver(property, observer);
+        this.removeObserver(property, invoker);
         return;
       }
 
+      var currentValue = elem.attr(attr);
+
       // A false result will remove the attribute from the element. This is
       // to support attributes such as disabled, whose presence is meaningful.
-      if (result === NO) {
+      if (result === NO && currentValue) {
         elem.removeAttr(attr);
 
       // Likewise, a true result will set the attribute's name as the value.
-      } else if (result === YES) {
+      } else if (result === YES && currentValue !== attr) {
         elem.attr(attr, attr);
 
-      } else {
+      } else if (currentValue !== result) {
         elem.attr(attr, result);
       }
-    });
+    };
+
+    invoker = function() {
+      this.invokeOnce(observer);
+    };
+
+    // Add an observer to the view for when the property changes.
+    // When the observer fires, find the element using the
+    // unique data id and update the attribute to the new value.
+    this.addObserver(property, invoker);
 
     // Use the attribute's name as the value when it is YES
     if (value === YES) {
@@ -246,9 +265,11 @@ SC.Handlebars.bindClasses = function(context, classBindings, view, id) {
     // the property changes.
     var oldClass;
 
+    var observer, invoker;
+
     // Set up an observer on the context. If the property changes, toggle the
     // class name.
-    var observer = function() {
+    observer = function() {
       // Get the current value of the property
       newClass = classStringForProperty(property);
       elem = id ? view.$("[data-handlebars-id='" + id + "']") : view.$();
@@ -256,7 +277,7 @@ SC.Handlebars.bindClasses = function(context, classBindings, view, id) {
       // If we can't find the element anymore, a parent template has been
       // re-rendered and we've been nuked. Remove the observer.
       if (elem.length === 0) {
-        context.removeObserver(property, observer);
+        context.removeObserver(property, invoker);
       } else {
         // If we had previously added a class to the element, remove it.
         if (oldClass) {
@@ -274,7 +295,11 @@ SC.Handlebars.bindClasses = function(context, classBindings, view, id) {
       }
     };
 
-    context.addObserver(property, observer);
+    invoker = function() {
+      this.invokeOnce(observer);
+    };
+
+    context.addObserver(property, invoker);
 
     // We've already setup the observer; now we just need to figure out the correct
     // behavior right now on the first pass through.

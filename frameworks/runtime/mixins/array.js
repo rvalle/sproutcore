@@ -374,6 +374,25 @@ SC.CoreArray = /** @lends SC.Array.prototype */ {
   },
 
   /**
+    Returns a new array that is a one-dimensional flattening of this array,
+    i.e. for every element of this array extract that and it's elements into
+    a new array.
+
+    @returns {Array}
+   */
+  flatten: function() {
+    var ret = [];
+    this.forEach(function(k) {
+      if (k && k.isEnumerable) {
+        ret = ret.pushObjects(k.flatten());
+      } else {
+        ret.pushObject(k);
+      }
+    });
+    return ret;
+  },
+
+  /**
     Returns the largest Number in an array of Numbers. Make sure the array
     only contains values of type Number to get expected result.
 
@@ -567,6 +586,14 @@ SC.CoreArray = /** @lends SC.Array.prototype */ {
     var target, action;
     var didChangeObservers = this._kvo_array_did_change;
     if (didChangeObservers) {
+      // If arrayContentDidChange is called with no parameters, assume the
+      // entire array has changed.
+      if (start === undefined) {
+        start = 0;
+        removedCount = this.get('length');
+        addedCount = 0;
+      }
+
       members = didChangeObservers.members;
       membersLen = members.length;
 
@@ -654,7 +681,7 @@ SC.CoreArray = /** @lends SC.Array.prototype */ {
         chain.notifyPropertyDidChange();
 
         for (idx = 0; idx < len; idx++) {
-          item = removedObjects[idx];
+          item = removedObjects.objectAt(idx);
           clonedChain = item[kvoChainList][chainGuid];
           clonedChain.deactivate();
           delete item[kvoChainList][chainGuid];
@@ -683,7 +710,7 @@ SC.CoreArray = /** @lends SC.Array.prototype */ {
 
         len = addedObjects.get('length');
         for (idx = 0; idx < len; idx++) {
-          this._clonePropertyChainToItem(chain, addedObjects[idx]);
+          this._clonePropertyChainToItem(chain, addedObjects.objectAt(idx));
         }
       }, this);
     }

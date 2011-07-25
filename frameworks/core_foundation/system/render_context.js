@@ -50,7 +50,8 @@ SC.COMBO_STYLES = {
   context.begin() <-- begins a new tag context
   context.end() <-- ends the tag context...
 */
-SC.RenderContext = SC.Builder.create(/** SC.RenderContext.fn */ {
+SC.RenderContext = SC.Builder.create(
+  /** @lends SC.RenderContext */ {
 
   SELF_CLOSING: SC.CoreSet.create().addEach(['area', 'base', 'basefront', 'br', 'hr', 'input', 'img', 'link', 'meta']),
 
@@ -259,40 +260,7 @@ SC.RenderContext = SC.Builder.create(/** SC.RenderContext.fn */ {
     @returns {DOMElement} the element
   */
   element: function() {
-    if (this._elem) return this._elem;
-
-    // create factory div if needed
-    var K       = SC.RenderContext,
-        factory = K.factory,
-        ret, child;
-
-    if (!factory) {
-      factory = K.factory = document.createElement('div');
-    }
-    factory.innerHTML = this.join();
-
-    // In IE something weird happens when reusing the same element.
-    // After setting innerHTML, the innerHTML of the element in the previous
-    // view turns blank.  It seems that there is something weird with their
-    // garbage  collection algorithm. I tried just removing the nodes after
-    // keeping a  reference to the first child, but it didn't work.  I ended
-    // up cloning the first child.
-    if (SC.browser.msie) {
-      if (factory.innerHTML.length > 0) {
-        child = factory.firstChild.cloneNode(true);
-        factory.innerHTML = '';
-      }
-      else {
-        child = null;
-      }
-    }
-    else {
-      // Faster path (avoiding the unnecessary node clone) for non-IE
-      // browsers.
-      child = factory.firstChild;
-    }
-
-    return child ;
+    return this._elem ? this._elem : SC.$(this.join())[0];
   },
 
   /**
@@ -328,7 +296,7 @@ SC.RenderContext = SC.Builder.create(/** SC.RenderContext.fn */ {
   update: function() {
     var elem = this._elem,
         mode = this.updateMode,
-        cq, key, value, attr, styles, factory, cur, next, before;
+        cq, value, factory, cur, next;
 
     this._innerHTMLReplaced = NO;
 
@@ -351,14 +319,13 @@ SC.RenderContext = SC.Builder.create(/** SC.RenderContext.fn */ {
       } else {
         factory = elem.cloneNode(false);
         factory.innerHTML = this.join() ;
-        before = (mode === SC.MODE_APPEND) ? null : elem.firstChild;
         cur = factory.firstChild ;
         while(cur) {
           next = cur.nextSibling ;
           elem.insertBefore(cur, next);
           cur = next ;
         }
-        cur = next = factory = before = null ; // cleanup
+        cur = next = factory = null ; // cleanup
       }
     }
 
@@ -628,8 +595,9 @@ SC.RenderContext = SC.Builder.create(/** SC.RenderContext.fn */ {
         this._classNamesDidChange = YES ;
       }
     } else {
+      var cl;
       for(var i = 0, iLen= nameOrClasses.length; i<iLen; i++){
-        var cl = nameOrClasses[i];
+        cl = nameOrClasses[i];
         if (classNames.indexOf(cl)<0) {
           classNames.push(cl);
           this._classNamesDidChange = YES ;

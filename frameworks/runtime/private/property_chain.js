@@ -149,9 +149,10 @@ SC._PropertyChain = SC.Object.extend(
 
       this.next.activate(newObj); // reactivate down the line
     }
-  },
+  }
 
-  //@ if (debug)
+  // @if (debug)
+  ,
   /**
     Returns a string representation of the chain segment.
 
@@ -161,7 +162,7 @@ SC._PropertyChain = SC.Object.extend(
     return "SC._PropertyChain(target: %@, property: %@)".fmt(
       this.get('target'), this.get('property'));
   }
-  //@ endif
+  // @endif
 });
 
 SC._PropertyChain.createChain = function(path, target, toInvalidate) {

@@ -4,26 +4,52 @@
 //            ©2008-2011 Apple Inc. All rights reserved.
 // License:   Licensed under MIT license (see license.js)
 // ==========================================================================
-/** @class
 
+sc_require('views/template');
+
+/**
+  @class
 */
-SC.TextFieldSupport = /** @scope SC.TextFieldSupport.prototype */{
-  
+SC.TextFieldSupport = /** @scope SC.TextFieldSupport */{
+
+  $input: function() {
+    return this.$('input');
+  },
+
   /** @private
     Used internally to store value because the layer may not exist
   */
   _value: null,
-  
+
   /**
+    The problem this property is trying to solve is twofold:
+
+    1. Make it possible to set the value of a text field that has
+       not yet been inserted into the DOM
+    2. Make sure that `value` properly reflects changes made directly
+       to the element's `value` property.
+
+    In order to achieve (2), we need to make the property volatile,
+    so that SproutCore will call the getter no matter what if get()
+    is called.
+
+    In order to achieve (1), we need to store a local cache of the
+    value, so that SproutCore can set the proper value as soon as
+    the underlying DOM element is created.
+
     @type String
-    @default null
+    @default  null
   */
   value: function(key, value) {
-    var input = this.$('input');
+    var input = this.$input();
 
     if (value !== undefined) {
-      this._value = value;
-      input.val(value);
+      // We don't want to unnecessarily set the value.
+      // Doing that could cause the selection to be lost.
+      if (this._value !== value || input.val() !== value) {
+        this._value = value;
+        input.val(value);
+      }
     } else {
       if (input.length > 0) {
         value = this._value = input.val();
@@ -36,12 +62,36 @@ SC.TextFieldSupport = /** @scope SC.TextFieldSupport.prototype */{
   }.property().idempotent(),
 
   didCreateLayer: function() {
-    var input = this.$('input');
+    var input = this.$input(),
+        self = this;
 
     input.val(this._value);
 
-    SC.Event.add(input, 'focus', this, this.focusIn);
-    SC.Event.add(input, 'blur', this, this.focusOut);
+    if (SC.browser.msie) {
+      SC.Event.add(input, 'focusin', this, this.focusIn);
+      SC.Event.add(input, 'focusout', this, this.focusOut);
+    } else {
+      SC.Event.add(input, 'focus', this, this.focusIn);
+      SC.Event.add(input, 'blur', this, this.focusOut);
+    }
+
+    input.bind('change', function() {
+      self.domValueDidChange(SC.$(this));
+    });
+  },
+
+  willDestroyLayerMixin: function() {
+    var input = this.$input();
+
+    if (SC.browser.msie) {
+      SC.Event.remove(input, 'focusin', this, this.focusIn);
+      SC.Event.remove(input, 'focusout', this, this.focusOut);
+    } else {
+      SC.Event.remove(input, 'focus', this, this.focusIn);
+      SC.Event.remove(input, 'blur', this, this.focusOut);
+    }
+
+    input.unbind('change');
   },
 
   focusIn: function(event) {
@@ -52,6 +102,16 @@ SC.TextFieldSupport = /** @scope SC.TextFieldSupport.prototype */{
   focusOut: function(event) {
     this.resignFirstResponder();
     this.tryToPerform('blur', event);
+  },
+
+  touchStart: function(evt) {
+    evt.allowDefault();
+    return YES;
+  },
+
+  touchEnd: function(evt) {
+    evt.allowDefault();
+    return YES;
   },
 
   /** @private
@@ -65,12 +125,59 @@ SC.TextFieldSupport = /** @scope SC.TextFieldSupport.prototype */{
     this.notifyPropertyChange('value');
   },
 
+  domValueDidChange: function(jquery) {
+    this.set('value', jquery.val());
+  },
+
   keyUp: function(event) {
-    if (event.keyCode === 13) {
+    this.domValueDidChange(this.$input());
+
+    if (event.keyCode === SC.Event.KEY_RETURN) {
       return this.tryToPerform('insertNewline', event);
-    } else if (event.keyCode === 27) {
+    } else if (event.keyCode === SC.Event.KEY_ESC) {
       return this.tryToPerform('cancel', event);
     }
   }
 };
+
+/**
+  @class
+  @extends SC.TemplateView
+  @extends SC.TextFieldSupport
+*/
+SC.TextField = SC.TemplateView.extend(SC.TextFieldSupport,
+/** @scope SC.TextField.prototype */ {
+
+  classNames: ['sc-text-field'],
+
+  /**
+    If set to `YES` uses textarea tag instead of input to
+    accommodate multi-line strings.
+
+    @type Boolean
+    @default NO
+  */
+  isMultiline: NO,
+
+  // we can't use bindAttr because of a race condition:
+  //
+  // when `value` is set, the bindAttr observer immediately calls
+  // `get` in order to persist it to the DOM, but because we made
+  // the `value` property idempotent, when it gets called by
+  // bindAttr, it fetches the not-yet-updated value from the DOM
+  // and returns it.
+  //
+  // In short, because we need to be able to catch changes to the
+  // DOM made directly, we cannot also rely on bindAttr to update
+  // the property: a chicken-and-egg problem.
+  template: function(){
+    return SC.Handlebars.compile(this.get('isMultiline') ? '<textarea></textarea>' : '<input type="text">');
+  }.property('isMultiline').cacheable(),
+
+  $input: function() {
+    var tagName = this.get('isMultiline') ? 'textarea' : 'input';
+    return this.$(tagName);
+  }
+
+});
 

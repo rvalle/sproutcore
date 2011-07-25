@@ -159,14 +159,13 @@ SC.PopupButtonView = SC.ButtonView.extend(
 
     @param {SC.Event} evt
   */
-  action: function(evt)
-  {
+  action: function(evt) {
     var menu = this.get('instantiatedMenu') ;
 
     if (!menu) {
-      //@ if (debug)
+      // @if (debug)
       SC.Logger.warn("SC.PopupButton - Unable to show menu because the menu property is set to %@.".fmt(menu));
-      //@ endif
+      // @endif
       return NO ;
     }
 
@@ -280,8 +279,7 @@ SC.PopupButtonView = SC.ButtonView.extend(
     alt_shift_z)
     @param {SC.Event} evt
   */
-  performKeyEquivalent: function( charCode, evt )
-  {
+  performKeyEquivalent: function(charCode, evt) {
     if (!this.get('isEnabled')) return NO ;
     var menu = this.get('instantiatedMenu') ;
 
@@ -300,4 +298,3 @@ SC.PopupButtonMenuLoader = SC.Task.extend({
     if (this.popupButton) this.popupButton._instantiateMenu();
   }
 });
-

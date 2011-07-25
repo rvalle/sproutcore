@@ -249,44 +249,48 @@ SC.Pane = SC.View.extend(SC.ResponderContext,
     @param {Event} evt that cause this to become first responder
     @returns {SC.Pane} receiver
   */
-  makeFirstResponder: function(view, evt) {
+  makeFirstResponder: function(original, view, evt) {
+    // firstResponder should never be null
+    if(!view) view = this;
+
     var current=this.get('firstResponder'), isKeyPane=this.get('isKeyPane');
     if (current === view) return this ; // nothing to do
     if (SC.platform.touch && view && view.kindOf(SC.TextFieldView) && !view.get('focused')) return this;
 
-    // notify current of firstResponder change
-    if (current) current.willLoseFirstResponder(current, evt);
-
     // if we are currently key pane, then notify key views of change also
     if (isKeyPane) {
       if (current) { current.tryToPerform('willLoseKeyResponderTo', view); }
-      if (view) { view.tryToPerform('willBecomeKeyResponderFrom', current); }
+      if (view) {
+        view.tryToPerform('willBecomeKeyResponderFrom', current);
+      }
     }
 
-    // change setting
     if (current) {
-      current.beginPropertyChanges()
-        .set('isFirstResponder', NO).set('isKeyResponder', NO)
-      .endPropertyChanges();
+      current.beginPropertyChanges();
+      current.set('isKeyResponder', NO);
     }
-
-    this.set('firstResponder', view) ;
 
     if (view) {
-      view.beginPropertyChanges()
-        .set('isFirstResponder', YES).set('isKeyResponder', isKeyPane)
-      .endPropertyChanges();
+      view.beginPropertyChanges();
+      view.set('isKeyResponder', isKeyPane);
     }
+
+    original(view, evt);
+
+    if(current) current.endPropertyChanges();
+    if(view) view.endPropertyChanges();
 
     // and notify again if needed.
     if (isKeyPane) {
-      if (view) { view.tryToPerform('didBecomeKeyResponderFrom', current); }
-      if (current) { current.tryToPerform('didLoseKeyResponderTo', view); }
+      if (view) {
+        view.tryToPerform('didBecomeKeyResponderFrom', current); }
+      if (current) {
+        current.tryToPerform('didLoseKeyResponderTo', view);
+      }
     }
 
-    if (view) view.didBecomeFirstResponder(view);
     return this ;
-  },
+  }.enhance(),
 
   /**
     Called just before the pane loses it's keyPane status.  This will notify
@@ -294,7 +298,7 @@ SC.Pane = SC.View.extend(SC.ResponderContext,
     giving it one last opportunity to save its state.
 
     @param {SC.Pane} pane
-    @returns {SC.Pane} reciever
+    @returns {SC.Pane} receiver
   */
   willLoseKeyPaneTo: function(pane) {
     this._forwardKeyChange(this.get('isKeyPane'), 'willLoseKeyResponderTo', pane, NO);
@@ -316,13 +320,15 @@ SC.Pane = SC.View.extend(SC.ResponderContext,
   },
 
 
+  didBecomeKeyResponderFrom: function(responder) {},
+
   /**
     Called just after the pane has lost its keyPane status.  Notifies the
     current keyView of the change.  The keyView can use this method to do any
     final cleanup and changes its own display value if needed.
 
     @param {SC.Pane} pane
-    @returns {SC.Pane} reciever
+    @returns {SC.Pane} receiver
   */
   didLoseKeyPaneTo: function(pane) {
     var isKeyPane = this.get('isKeyPane');
@@ -432,6 +438,9 @@ SC.Pane = SC.View.extend(SC.ResponderContext,
     var dom = this.get('layer') ;
     if (dom && dom.parentNode) dom.parentNode.removeChild(dom) ;
     dom = null ;
+
+    // layer is cached by SC.View in this._view_layer, remove it so that the DOM node can be freed
+    this.destroyLayer();
 
     // remove intercept
     this._removeIntercept();

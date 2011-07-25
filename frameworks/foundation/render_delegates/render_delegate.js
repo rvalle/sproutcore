@@ -14,7 +14,7 @@
   and can be simpler to subclass between themes than `SC.Object`.
 
   Creating & Subclassing
-  ============================
+  ===
   You create render delegates just like you create SC.Objects:
 
       MyTheme.someRenderDelegate = SC.RenderDelegate.create({ ... });
@@ -40,7 +40,7 @@
   that you expect to be instances.
 
   Rendering and Updating
-  =========================
+  ===
   Render delegates are most commonly used for two things: rendering and updating
   DOM representations of controls.
 
@@ -61,7 +61,7 @@
       }
 
   Variables
-  ==========================
+  ===
   The data source provides your render delegate with all of the information
   needed to render. However, the render delegate's consumer--usually a view--
   may need to get information back.
@@ -111,7 +111,7 @@
   helper discussion below.
 
   Helpers
-  =====================
+  ===
   SC.RenderDelegate have "helper methods" to assist the rendering process.
   There are a few built-in helpers, and you can add your own.
 
@@ -126,7 +126,7 @@
   directive. For example:
 
       MyTheme.buttonRenderDelegate = SC.RenderDelegate.create({
-        name: 'button',
+        className: 'button',
         render: function(dataSource, context) {
           this.includeSlices(dataSource, context, SC.THREE_SLICE);
         }
@@ -199,7 +199,7 @@
   You can then use the helpers from your render delegates:
 
       MyTheme.someRenderDelegate = SC.RenderDelegate.create({
-        name: 'some-thingy',
+        className: 'some-thingy',
         render: function(dataSource, context) {
           this.myHelperMethod(dataSource);
         }
@@ -242,7 +242,7 @@
       });
 
   Data Sources
-  ====================
+  ===
   Render delegates get the content to be rendered from their data sources.
 
   A data source can be any object, so long as the object implements
@@ -260,17 +260,17 @@
     While render delegates are _usually_ completely stateless, there are
     cases where they may need to save some sort of state.
 */
-SC.RenderDelegate = {
+SC.RenderDelegate = /** @scope SC.RenderDelegate.prototype */{
+  
   // docs will look more natural if these are all considered instance
   // methods/properties.
-  /*@scope SC.RenderDelegate.prototype*/
 
   /**
     Creates a new render delegate based on this one. When you want to
     create a render delegate, you call this:
    
         MyTheme.myRenderDelegate = SC.RenderDelegate.create({
-          name: 'my-render-delegate',
+          className: 'my-render-delegate',
           render: function(dataSource, context) {
             // your code here...
           }
@@ -310,7 +310,7 @@ SC.RenderDelegate = {
       }
 
       if (v && v.isEnhancement && v !== this[i]) {
-        v = SC._enhance(this[i] || K, v);
+        v = SC._enhance(this[i] || SC.K, v);
       }
 
       this[i] = v;
@@ -343,11 +343,11 @@ SC.RenderDelegate = {
   },
 
   /**
-    All render delegates should have a name. Any time a render delegate is
+    All render delegates should have a class name. Any time a render delegate is
     used, this name should be added as a class name (`SC.View`s do this
     automatically).
   */
-  name: undefined,
+  className: undefined,
 
   /**
     Writes the DOM representation of this render delegate to the

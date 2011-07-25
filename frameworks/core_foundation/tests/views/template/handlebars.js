@@ -1,9 +1,56 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2011 Strobe Inc. and contributors.
-//            ©2008-2011 Apple Inc. All rights reserved.
 // License:   Licensed under MIT license (see license.js)
 // ==========================================================================
+/*globals TemplateTests module */
+
+// Included to test bindAttr problem where setting an attr when it
+// has the same value is overkill and sometimes causes the browser
+// to misbehave, like in SC.TextField where listening to change
+// events caused the cursor to go to the end of the input
+(function() {
+
+  jQuery.fn.caretPosition = function() {
+      var ctrl = this[0];
+
+      var CaretPos = 0;
+      // IE Support
+      if (document.selection) {
+
+          ctrl.focus();
+          var Sel = document.selection.createRange ();
+
+          Sel.moveStart ('character', -ctrl.value.length);
+
+          CaretPos = Sel.text.length;
+      }
+      // Firefox support
+      else if (ctrl.selectionStart || ctrl.selectionStart == '0') {
+          CaretPos = ctrl.selectionStart;
+      }
+
+      return (CaretPos);
+  };
+
+
+  jQuery.fn.setCaretPosition = function(pos) {
+      var ctrl = this[0];
+
+      if(ctrl.setSelectionRange) {
+          ctrl.focus();
+          ctrl.setSelectionRange(pos,pos);
+      } else if (ctrl.createTextRange) {
+          var range = ctrl.createTextRange();
+          range.collapse(true);
+          range.moveEnd('character', pos);
+          range.moveStart('character', pos);
+          range.select();
+      }
+  }
+
+})();
+
 /**
   This module specifically tests integration with Handlebars and SproutCore-specific
   Handlebars extensions.
@@ -293,23 +340,29 @@ test("Handlebars templates update properties if a content object changes", funct
   equals(view.$('h2').text(), "brown coffee", "precond - renders color correctly");
   equals(view.$('#price').text(), '$4', "precond - renders price correctly");
 
-  view.set('coffee', SC.Object.create({
-    color: "mauve",
-    price: "$4.50"
-  }));
+  SC.run(function() {
+    view.set('coffee', SC.Object.create({
+      color: "mauve",
+      price: "$4.50"
+    }));
+  });
 
   equals(view.$('h2').text(), "mauve coffee", "should update name field when content changes");
   equals(view.$('#price').text(), "$4.50", "should update price field when content changes");
 
-  view.set('coffee', SC.Object.create({
-    color: "mauve",
-    price: "$5.50"
-  }));
+  SC.run(function() {
+    view.set('coffee', SC.Object.create({
+      color: "mauve",
+      price: "$5.50"
+    }));
+  });
 
   equals(view.$('h2').text(), "mauve coffee", "should update name field when content changes");
   equals(view.$('#price').text(), "$5.50", "should update price field when content changes");
 
-  view.setPath('coffee.price', "$5");
+  SC.run(function() {
+    view.setPath('coffee.price', "$5");
+  });
 
   equals(view.$('#price').text(), "$5", "should update price field when price property is changed");
 });
@@ -334,11 +387,11 @@ test("Template updates correctly if a path is passed to the bind helper", functi
 
   equals(view.$('h1').text(), "$4", "precond - renders price");
 
-  view.setPath('coffee.price', "$5");
+  SC.run(function() { view.setPath('coffee.price', "$5"); });
 
   equals(view.$('h1').text(), "$5", "updates when property changes");
 
-  view.set('coffee', { price: "$6" });
+  SC.run(function() { view.set('coffee', { price: "$6" }); });
   equals(view.$('h1').text(), "$6", "updates when parent property changes");
 });
 
@@ -354,7 +407,7 @@ test("Template updates correctly if a path is passed to the bind helper and the 
     price: "$4"
   });
 
-  controller.set('content', realObject);
+  SC.run(function() { controller.set('content', realObject); });
 
   var view = SC.TemplateView.create({
     templateName: 'menu',
@@ -367,7 +420,7 @@ test("Template updates correctly if a path is passed to the bind helper and the 
 
   equals(view.$('h1').text(), "$4", "precond - renders price");
 
-  realObject.set('price', "$5");
+  SC.run(function() { realObject.set('price', "$5"); });
 
   equals(view.$('h1').text(), "$5", "updates when property is set on real object");
 
@@ -848,6 +901,30 @@ test("should be able to bind element attributes using {{bindAttr}}", function() 
   equals(view.$('img').attr('alt'), "Nanananana SproutCore!", "updates alt attribute when title property is computed");
 });
 
+test("should not reset cursor position when text field receives keyUp event", function() {
+  var pane = SC.Pane.create({
+    childViews: ['view'],
+    view: SC.TextField.create({
+      value: "Broseidon, King of the Brocean"
+    })
+  });
+
+  pane.append();
+
+  var view = pane.get('childViews')[0];
+
+  view.$('input').val('Brosiedoon, King of the Brocean');
+  view.$('input').setCaretPosition(5);
+
+  SC.run(function() {
+    view.keyUp({});
+  });
+
+  equals(view.$('input').caretPosition(), 5, "The keyUp event should not result in the cursor being reset due to the bindAttr observers");
+
+  pane.remove().destroy();
+});
+
 test("should be able to bind element attributes using {{bindAttr}} inside a block", function() {
   var template = SC.Handlebars.compile('{{#with content}}<img {{bindAttr src="url" alt="title"}}>{{/with}}');
 
@@ -891,7 +968,7 @@ test("should be able to bind class attribute with {{bindAttr}}", function() {
 });
 
 test("should be able to bind boolean element attributes using {{bindAttr}}", function() {
-  var template = SC.Handlebars.compile('<input type="check" {{bindAttr disabled="content.isDisabled" checked="content.isChecked"}} />');
+  var template = SC.Handlebars.compile('<input type="checkbox" {{bindAttr disabled="content.isDisabled" checked="content.isChecked"}} />');
   var content = SC.Object.create({
     isDisabled: false,
     isChecked: true
@@ -907,8 +984,10 @@ test("should be able to bind boolean element attributes using {{bindAttr}}", fun
   ok(!view.$('input').attr('disabled'), 'attribute does not exist upon initial render');
   ok(view.$('input').attr('checked'), 'attribute is present upon initial render');
 
-  content.set('isDisabled', true);
-  content.set('isChecked', false);
+  SC.run(function() {
+    content.set('isDisabled', true);
+    content.set('isChecked', false);
+  });
 
   ok(view.$('input').attr('disabled'), 'attribute exists after update');
   ok(!view.$('input').attr('checked'), 'attribute is not present after update');
@@ -931,7 +1010,9 @@ test("should be able to add multiple classes using {{bindAttr class}}", function
   ok(view.$('div').hasClass('is-awesome-sauce'), "dasherizes first property and sets classname");
   ok(view.$('div').hasClass('is-also-cool'), "dasherizes second property and sets classname");
 
-  content.set('isAwesomeSauce', false);
+  SC.run(function() {
+    content.set('isAwesomeSauce', false);
+  });
 
   ok(!view.$('div').hasClass('is-awesome-sauce'), "removes dasherized class when property is set to false");
 });
