@@ -7,7 +7,7 @@
 
 
 SC.BaseTheme.desktopScrollerRenderDelegate = SC.RenderDelegate.create({
-  name: 'desktop-scroller',
+  className: 'desktop-scroller',
 
   render: function (dataSource, context) {
     var layoutDirection = dataSource.get('layoutDirection'),
@@ -68,6 +68,10 @@ SC.BaseTheme.desktopScrollerRenderDelegate = SC.RenderDelegate.create({
 
     if (dataSource.didChangeFor(K, 'value')) {
       context.attr('aria-valuenow', dataSource.get('value'));
+    }
+
+    if (dataSource.didChangeFor(K, 'controlsId')) {
+      context.attr('aria-controls', dataSource.get('controlsId'));
     }
 
     // Don't bother if the controls are hidden.

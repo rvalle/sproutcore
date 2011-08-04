@@ -5,7 +5,7 @@
 // ==========================================================================
 
 SC.BaseTheme.scrollRenderDelegate = SC.RenderDelegate.create({
-  name: 'scroll',
+  className: 'scroll',
 
   render: function (dataSource, context) {
     context.push('<div class="corner"></div>');
@@ -14,7 +14,7 @@ SC.BaseTheme.scrollRenderDelegate = SC.RenderDelegate.create({
   update: function (dataSource, context) {
     var K = 'scrollRenderDelegate',
         thicknessDidChange = dataSource.didChangeFor(K, 'nativeScrollbarThickness'),
-        scroll = context.find('.sc-scroll-container-view'),
+        scroll = context.find('> .sc-scroll-container-view'),
         canScroll, thickness = dataSource.get('nativeScrollbarThickness');
 
     if (thicknessDidChange || dataSource.didChangeFor(K, 'canScrollHorizontal')) {
